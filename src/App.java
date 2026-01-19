@@ -464,9 +464,9 @@ public class App extends PApplet {
     // Load High Score
     void loadHighScore() {
         String[] lines = loadStrings("highscore.txt"); 
-        if (lines != null && lines.length > 0) {
+        if (lines != null && lines.length > 0) {// Check if file is not empty
             try {
-                highscore = Integer.parseInt(lines[0]);
+                highscore = Integer.parseInt(lines[0]);// Load high score
             } catch (Exception e) {
                 highscore = 0;
             }
@@ -481,7 +481,7 @@ public class App extends PApplet {
     // Confetti Inner Class
     class Confetti {
         float x, y, speedY;
-        int c;
+        int c;// Color
 
         public Confetti() {
             x = random(width);        // Random X position
