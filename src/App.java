@@ -8,6 +8,7 @@ public class App extends PApplet {
     ArrayList<Flower> flowers = new ArrayList<>();
     ArrayList<Bullet> bullets = new ArrayList<>();
     ArrayList<Zombie> zombies = new ArrayList<>();
+    ArrayList<Confetti> confettiList = new ArrayList<>();
 
     // Images
     PImage personImg;
@@ -19,23 +20,32 @@ public class App extends PApplet {
     int cellSize = 125;
 
     // Movement Switches
-    boolean isLeft, isRight, isUp, isDown;
-    boolean Fdown;
-    boolean Ydown;
-    boolean Ndown;
+   private boolean isLeft, isRight, isUp, isDown;
+   private boolean Fdown;
+   private boolean Ydown;
+   private boolean Ndown;
 
     // Game State
-    int gameState = 0; // 0 = Start, 1 = Playing, 2 = Game Over, 3 = Quit Confirm this makes it easier
+    private int gameState = 0; // 0 = Start, 1 = Playing, 2 = Game Over, 3 = Quit Confirm this makes it easier
                        // for me to give the player the ability to quit and for the game to know when
                        // to do things based on where the code says it is at
-    String typingName = "";
+                       //4 FOR CONFETTI
+   private String typingName = "";
 
     // money
-    int money = 100;
+    private int money = 100;
 
     //Stats
-    int amountoftimesjuice = 0;
-    int amountoftimestakendamage = 0;
+    private int amountoftimesjuice = 0;
+    private int amountoftimestakendamage = 0;
+    
+    // New Score Variables
+    private int score = 0;
+    private int highscore = 0;
+    private int lives = 3; 
+
+    // Array Requirement so we can make the rows using 2d arrays
+    private int[] spawnRows;
 
 
     public static void main(String[] args) {
@@ -71,6 +81,15 @@ public class App extends PApplet {
         }
         imageMode(CENTER);
         person = new Person(400, 500);
+        
+        loadHighScore();
+
+        // Initialize Array for spawning 2d array
+        int rows = height / cellSize;
+        spawnRows = new int[rows];
+        for(int i = 0; i < rows; i++){
+            spawnRows[i] = i * cellSize + cellSize/2;
+        }
     }
 
     public void draw() {
@@ -97,19 +116,52 @@ public class App extends PApplet {
         fill(0, 255, 0);
         textSize(50);
         text(typingName + "_", width / 2, 320);
+        
+        textSize(20);
+        fill(0);
+        text("Current High Score: " + highscore, width / 2, 400);
     }
 
     public void drawGameOver() {
+        if (score > highscore) {//if there is a new highscore
+            highscore = score;
+            saveHighScore();
+        }
+        
         background(0);
+        
+        // CONFETTI LOGIC
+        if (confettiList.size() < 300) {
+            confettiList.add(new Confetti());
+        }
+        for (Confetti c : confettiList) {
+            c.update();
+            c.display();
+        }
+        
         fill(255, 0, 0);
         textSize(60);
-        textAlign(CENTER, CENTER);
-        text("GAME OVER", width / 2, height / 2);
+        textAlign(CENTER, CENTER);//alignign it to the center
+        text("GAME OVER", width / 2, height / 2 - 50);//text saying the game is over
+        
+        textSize(30);
+        fill(255);
+        text("Final Score: " + score, width / 2, height / 2 + 10);//text staying your final score
+        
+        textSize(30);
+        fill(255, 215, 0); 
+        text("High Score: " + highscore, width / 2, height / 2 + 50);//text saying your high score
+        
+        fill(255, 0, 0);
         textSize(30);
         text(person.name + " died!", width / 2, height / 2 + 60);
         textSize(30);
-        text(person.name + "Took damage " + amountoftimestakendamage + " times", width / 2, height / 2 + 1);
-        text(person.name + "Drank juice " + amountoftimesjuice + " times", width / 2, height / 2 + 1);
+        text(person.name + "Took damage " + amountoftimestakendamage + " times", width / 2, height / 2 + 1);//text saying how many times you took damage
+        text(person.name + "Drank juice " + amountoftimesjuice + " times", width / 2, height / 2 + 1);//text saying how many times you drank juice
+        
+        fill(255);
+        textSize(20);
+        text("Press 'R' to Restart", width / 2, height - 50);
     }
 
     public void drawQuitScreen() {
@@ -118,7 +170,7 @@ public class App extends PApplet {
         textAlign(CENTER, CENTER);
         textSize(30);
         text("Exiting Game: Thank you for playing!", width / 2, height / 2);
-        text("Are you sure you want to quit? (Y/N)", width / 2, height / 2 + 40);
+        text("Are you sure you want to quit? (Y/N)", width / 2, height / 2 + 40);//if you want to quit then it gives you the option
     }
 
     public void drawGame() {
@@ -128,14 +180,14 @@ public class App extends PApplet {
         // 2. Draw Grid
         stroke(0);
         strokeWeight(1);
-        for (int x = 0; x < width; x = x + cellSize) {
+        for (int x = 0; x < width; x = x + cellSize) {//making the grid
             for (int y = 0; y < height; y = y + cellSize) {
                 fill(140, 70, 20);
                 rect(x, y, cellSize, cellSize);
             }
         }
 
-        if (isLeft)
+        if (isLeft)//using a boolean to make it so we can get the smooth movemnt and in the person class i made the method of moveleft etc
             person.moveLeft();
         if (isRight)
             person.moveRight();
@@ -144,32 +196,42 @@ public class App extends PApplet {
         if (isDown)
             person.moveDown();
         
-        // UPDATE COOLDOWN (Reduces invincibility timer AND juice timer)
         person.updateCooldown(); 
 
         // 4. Flowers
-        for (Flower flower : flowers) {
+        for (Flower flower : flowers) {//display the flowers
             flower.update(this);
             flower.display(this);
         }
         // Zombies!!
         // ZOMBIE SPAWNING
         if (frameCount % 120 == 0) {// every 2 seconds
-
-            int row = (int) random(0, height / cellSize) * cellSize + cellSize / 2;
+            int rIndex = (int)random(spawnRows.length); 
+            int row = spawnRows[rIndex];
             zombies.add(new Zombie(width, row));
         }
 
         // Remove zombies with health <= 0
         for (int i = zombies.size() - 1; i >= 0; i--) {
-            if (zombies.get(i).Zombiehealth <= 0) {
+            Zombie z = zombies.get(i);
+            
+            if (z.getZombiehealth() <= 0) {
                 zombies.remove(i);
+            } 
+            // CHECK IF ZOMBIE REACHED END (LIVES)
+            else if (z.x < 0) {
+                zombies.remove(i);
+                lives--;
+                System.out.println("Lost a life! Lives: " + lives);
+                if (lives <= 0) {
+                     gameState = 2;
+                }
             }
         }
 
         // DRAW & MOVE ZOMBIES
         for (Zombie z : zombies) {
-            z.update(); // Move the zombie
+            z.update(person); // Move the zombie, passing the person object
             z.display(this); // Draw the zombie
         }
 
@@ -186,13 +248,14 @@ public class App extends PApplet {
             // if bullet hits Zombie
             for (int j = zombies.size() - 1; j >= 0; j--) {
                 Zombie z = zombies.get(j);
-                if (dist(b.x, b.y, z.x, z.y) < 40) {
-                    z.Zombiehealth -= 10; // Take damage
-                    System.out.println("OUCH! Health: " + z.Zombiehealth);
-                    bullets.remove(i); // Delete bullet
-                    if (z.Zombiehealth <= 0) {
+                if (dist(b.x, b.y, z.x, z.y) < 40) {//if the distance between the zombie and the bullet is les than 40 pixels we use the distance function
+                    z.setZombiehealth(z.getZombiehealth() - 10); // Take damage
+                    System.out.println("OUCH! Health: " + z.getZombiehealth());
+                    bullets.remove(i); // Delete bullet from array list
+                    if (z.getZombiehealth() <= 0) {
                         zombies.remove(j);
                         money = money + 100;
+                        score++;
                         System.out.println("Money: " + money);
 
                     }
@@ -205,12 +268,11 @@ public class App extends PApplet {
             }
         }
 
-        // 6. ZOMBIE HITS PERSON (Fixed with Cooldown)
         for (int j = zombies.size() - 1; j >= 0; j--) {
-            Zombie z = zombies.get(j);
+            Zombie z = zombies.get(j);//
             // CHECK IF CLOSE AND IF COOLDOWN IS 0
             if (dist(z.x, z.y, person.x, person.y) < 40 && person.damageCooldown == 0) {
-                person.health -= 10; // Take damage
+                person.decreaseHealth(10); // Take damage
                 person.damageCooldown = 60; // Set invincibility for 60 frames (1 second)
                 System.out.println("OUCH! Health: " + person.health);
                 amountoftimestakendamage++;
@@ -225,23 +287,23 @@ public class App extends PApplet {
         // 7. Draw Person
         person.display(this);
         money();
-        HEALINGJUICE();
+        HEALINGJUICE();//if they will do the juice
     }
 
     public void keyPressed() {
         if (gameState == 0) {
             if (key == ENTER || key == RETURN) {
-                person.name = typingName;
-                gameState = 1;
-            } else if (key == BACKSPACE) {
+                person.name = typingName;// Set the player's name
+                gameState = 1;// Switch to Game State 1
+            } else if (key == BACKSPACE) {// If backspace is pressed then delete the letter
                 if (typingName.length() > 0) {
                     typingName = typingName.substring(0, typingName.length() - 1);
                 }
-            } else if (key != CODED) {
+            } else if (key != CODED) {// If key is not a special key
                 typingName = typingName + key;
             }
         } else if (gameState == 1) {
-            if (key == 'A' || key == 'a')
+            if (key == 'A' || key == 'a')//if the key is pressed then the boolean becomes true then the same for the rest
                 isLeft = true;
             if (key == 'D' || key == 'd')
                 isRight = true;
@@ -278,21 +340,21 @@ public class App extends PApplet {
             // PLANTING FLOWERS
             if (key == 'F' || key == 'f') {
 
-                if (FlowersYouCanPlant > 0) {
+                if (FlowersYouCanPlant > 0) {//if you have a flower to plant
 
-                    int snapX = (person.x / cellSize) * cellSize + (cellSize / 2);
-                    int snapY = (person.y / cellSize) * cellSize + (cellSize / 2);
+                    int snapX = (person.x / cellSize) * cellSize + (cellSize / 2);//put it in the center
+                    int snapY = (person.y / cellSize) * cellSize + (cellSize / 2);//also put it in the center
 
                     boolean spotIsTaken = false;
                     for (Flower f : flowers) {
                         if (f.x == snapX && f.y == snapY) {
-                            spotIsTaken = true;
+                            spotIsTaken = true;//if the spot is taken
                             break;
                         }
                     }
 
-                    if (!spotIsTaken) {
-                        flowers.add(new Flower(snapX, snapY));
+                    if (!spotIsTaken) {//if the spot is free
+                        flowers.add(new Flower(snapX, snapY));//add a flower then make it go in the center
                         FlowersYouCanPlant--;
                         System.out.println("Planted! Remaining: " + FlowersYouCanPlant);
                     } else {
@@ -302,20 +364,38 @@ public class App extends PApplet {
                     System.out.println("You have no flowers to plant! Press Y to buy.");
                 }
             }
+        } else if (gameState == 2) {
+             if (key == 'r' || key == 'R') {
+                 // Reset Game Logic and everything for the next game
+                 gameState = 1;
+                 score = 0;
+                 lives = 3; 
+                 money = 100;
+                 person.health = 100;
+                 zombies.clear();
+                 bullets.clear();
+                 flowers.clear();
+                 confettiList.clear();
+                 FlowersYouCanPlant = 0;
+                 amountoftimesjuice = 0;
+                 amountoftimestakendamage = 0;
+                 person.x = 400;
+                 person.y = 500;
+             }
         } else if (gameState == 3) {
             if (key == 'y' || key == 'Y')
                 exit();
             if (key == 'n' || key == 'N')
                 gameState = 1;
         }
-        // ... existing movement code ...
 
         // SECRET CHEAT CODE
         if (key == 'm' || key == 'M') {
-            money += 1000;
+            money += 1000;//adding the money 
             System.out.println("Secret cheat activated! Added $1000.");
         }
     }
+    
 
     public void HEALINGJUICE() {
         if (gameState == 1) {
@@ -367,6 +447,12 @@ public class App extends PApplet {
             fill(0);
 
             text("Money: $" + money, width / 2, 30);
+            text("Score: " + score, width / 2, 10);
+            
+            fill(255, 0, 0);
+            text("Lives: " + lives, width - 60, 30);
+            fill(0);
+            
             text("Flowers in Inventory: " + FlowersYouCanPlant, width / 2, 55);
 
             textSize(15);
@@ -375,149 +461,49 @@ public class App extends PApplet {
         }
     }
 
-    // CLASSES
-
-    class Flower {
-        int x, y;
-        int cooldown = 0;
-
-        public Flower(int x, int y) {
-            this.x = x;
-            this.y = y;
-        }
-
-        public void update(App app) {
-            if (cooldown > 0)
-                cooldown--;
-            if (cooldown == 0) {
-                app.bullets.add(new Bullet(x, y));
-                cooldown = 60;
-            }
-        }
-
-        // Gemini taught me how to use sprites
-        public void display(App app) {
-            if (app.flowerImg != null) {
-                app.image(app.flowerImg, x, y);
-            } else {
-                app.rectMode(PConstants.CENTER);
-                app.fill(255, 255, 0);
-                app.rect(x, y, 50, 50);
-                app.rectMode(PConstants.CORNER);
+    // Load High Score
+    void loadHighScore() {
+        String[] lines = loadStrings("highscore.txt"); 
+        if (lines != null && lines.length > 0) {
+            try {
+                highscore = Integer.parseInt(lines[0]);
+            } catch (Exception e) {
+                highscore = 0;
             }
         }
     }
 
-    class Bullet {
-        float x, y;
-        float speed = 10;
+    void saveHighScore() {//save your high score
+        String[] data = { str(highscore) }; 
+        saveStrings("highscore.txt", data);
+    }
 
-        public Bullet(float startX, float startY) {
-            x = startX;
-            y = startY;
+    // Confetti Inner Class
+    class Confetti {
+        float x, y, speedY;
+        int c;
+
+        public Confetti() {
+            x = random(width);        // Random X position
+            y = random(-500, -50);    // Start above the screen
+            speedY = random(2, 5);    // Random falling speed
+            c = color(random(255), random(255), random(255)); // Random color
         }
 
         public void update() {
-            x += speed;
-        }
+            y += speedY; // Move down
 
-        // Gemini taught me how to use sprites
-        public void display(App app) {
-            if (app.bulletImg != null) {
-                app.image(app.bulletImg, x, y);
-            } else {
-                app.fill(0);
-                app.ellipse(x, y, 10, 10);
-            }
-        }
-    }
-
-    class Person {
-        int x, y;
-        int speed = 5;
-        String name = "";
-        int health = 100; // Start with 100 health
-        int damageCooldown = 0; 
-        int juiceTimer = 0; // <--- NEW VARIABLE FOR HOLDING JUICE
-
-        public Person(int x, int y) {
-            this.x = x;
-            this.y = y;
-        }
-        
-        public void updateCooldown() {
-            if (damageCooldown > 0) {
-                damageCooldown--;
-            }
-            if (juiceTimer > 0) {// COUNTDOWN JUICE TIMER
-                juiceTimer--;
+            // If it falls off the bottom, reset to the top
+            if (y > height) {
+                y = random(-50, -10);
+                x = random(width);
             }
         }
 
-        public void moveLeft() {
-            x -= speed;
-        }
-
-        public void moveRight() {
-            x += speed;
-        }
-
-        public void moveUp() {
-            y -= speed;
-        }
-
-        public void moveDown() {
-            y += speed;
-        }
-
-        // Gemini taught me how to use sprites
-        public void display(App app) {
-            if (app.personImg != null) {
-                app.image(app.personImg, x, y);
-            } else {
-                app.fill(0, 0, 255);
-                app.ellipse(x, y, 50, 50);
-            }
-
-            // Draw Name
-            app.fill(255);
-            app.textAlign(PConstants.CENTER);
-            app.textSize(20);
-            app.text(name, x, y - 50);
-
-            // Draw Health
-            app.fill(0, 255, 0); // Green
-            app.text("HP: " + health, x, y - 70);
-        }
-    }
-}
-
-class Zombie {
-    int x, y;
-    int speed = 2;
-    int Zombiehealth = 40;
-
-    public Zombie(int x, int y) {
-        this.x = x;
-        this.y = y;
-    }
-
-    // Add update() method to move the zombie leftwards
-    public void update() {
-        x -= speed;
-    }
-
-    public void moveTowards(App.Person p) {
-        x++;
-    }
-    // Gemini taught me how to use sprites
-
-    public void display(App app) {
-        if (app.ZombieImg != null) {
-            app.image(app.ZombieImg, x, y);
-        } else {
-            app.fill(0, 0, 255);
-            app.ellipse(x, y, 50, 50);
+        public void display() {
+            noStroke();
+            fill(c);
+            rect(x, y, 8, 8); // Draw a small square
         }
     }
 }
